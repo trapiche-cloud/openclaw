@@ -123,6 +123,9 @@ RUN mkdir -p /home/node/.openclaw && \
 # Security hardening: Run as non-root user
 # The node:22-bookworm image includes a 'node' user (uid 1000)
 # This reduces the attack surface by preventing container escape via root privileges
+COPY --chown=node:node entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 USER node
 
 EXPOSE 3000
@@ -133,7 +136,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=3m --timeout=10s --start-period=15s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-# Shell form required to expand $PORT at runtime.
-# --bind lan: bind to 0.0.0.0 so Trapiche's bridge networking can reach the gateway.
-# --port $PORT: use the platform-injected PORT env var (default 3000).
-CMD node openclaw.mjs gateway --allow-unconfigured --port ${PORT} --bind lan
+ENTRYPOINT ["/app/entrypoint.sh"]
