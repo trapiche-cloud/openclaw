@@ -34,7 +34,10 @@ PORT="${PORT:-3000}"
   until node openclaw.mjs devices list --url "ws://127.0.0.1:$PORT" --token "$TOKEN" >/dev/null 2>&1; do
     sleep 2
   done
-  node openclaw.mjs devices approve --latest --url "ws://127.0.0.1:$PORT" --token "$TOKEN" 2>/dev/null || true
+  while true; do
+    node openclaw.mjs devices approve --latest --url "ws://127.0.0.1:$PORT" --token "$TOKEN" 2>/dev/null || true
+    sleep 3
+  done
 ) &
 
 exec node openclaw.mjs gateway --allow-unconfigured --port "$PORT" --bind lan
