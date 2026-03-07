@@ -112,14 +112,6 @@ RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Bake a minimal default config so the gateway can start without interactive setup.
-# dangerouslyAllowHostHeaderOriginFallback is required when binding to lan (0.0.0.0)
-# and no explicit allowedOrigins are set — the Host header is used as the origin.
-RUN mkdir -p /home/node/.openclaw && \
-    printf '{"gateway":{"controlUi":{"dangerouslyAllowHostHeaderOriginFallback":true}}}\n' \
-      > /home/node/.openclaw/openclaw.json && \
-    chown -R node:node /home/node/.openclaw
-
 # Security hardening: Run as non-root user
 # The node:22-bookworm image includes a 'node' user (uid 1000)
 # This reduces the attack surface by preventing container escape via root privileges

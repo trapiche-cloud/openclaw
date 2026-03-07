@@ -11,4 +11,17 @@ echo "  OPENCLAW_GATEWAY_PASSWORD=$PASSWORD"
 echo "========================================"
 echo ""
 
-exec node openclaw.mjs gateway --allow-unconfigured --port "${PORT:-3000}" --bind lan --auth password --password "$PASSWORD"
+# Write the gateway config with the password so it is loaded natively by OpenClaw.
+mkdir -p /home/node/.openclaw
+node -e "
+const fs = require('fs');
+const cfg = {
+  gateway: {
+    auth: { mode: 'password', password: process.env.PASSWORD },
+    controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
+  }
+};
+fs.writeFileSync('/home/node/.openclaw/openclaw.json', JSON.stringify(cfg, null, 2));
+" PASSWORD="$PASSWORD"
+
+exec node openclaw.mjs gateway --allow-unconfigured --port "${PORT:-3000}" --bind lan
