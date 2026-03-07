@@ -25,4 +25,16 @@ const cfg = {
 fs.writeFileSync('/home/node/.openclaw/openclaw.json', JSON.stringify(cfg, null, 2));
 "
 
-exec node openclaw.mjs gateway --allow-unconfigured --port "${PORT:-3000}" --bind lan
+PORT="${PORT:-3000}"
+
+# Auto-approve device pairing in the background.
+# Users already proved identity via the gateway token — pairing is redundant friction.
+# Polls until the gateway is ready, then approves any pending request once.
+(
+  until node openclaw.mjs devices list --url "ws://127.0.0.1:$PORT" --token "$TOKEN" >/dev/null 2>&1; do
+    sleep 2
+  done
+  node openclaw.mjs devices approve --latest --url "ws://127.0.0.1:$PORT" --token "$TOKEN" 2>/dev/null || true
+) &
+
+exec node openclaw.mjs gateway --allow-unconfigured --port "$PORT" --bind lan
