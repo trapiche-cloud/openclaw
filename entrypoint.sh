@@ -14,7 +14,7 @@ echo ""
 
 # Write the gateway config so it is loaded natively by OpenClaw.
 mkdir -p /home/node/.openclaw
-node -e "
+TOKEN="$TOKEN" node -e "
 const fs = require('fs');
 const cfg = {
   gateway: {
@@ -23,6 +23,6 @@ const cfg = {
   }
 };
 fs.writeFileSync('/home/node/.openclaw/openclaw.json', JSON.stringify(cfg, null, 2));
-" TOKEN="$TOKEN"
+"
 
 exec node openclaw.mjs gateway --allow-unconfigured --port "${PORT:-3000}" --bind lan
