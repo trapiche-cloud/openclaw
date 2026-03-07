@@ -683,6 +683,20 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
       );
       extra += `[config] gateway.controlUi.allowInsecureAuth=true exit=${allowInsecureResult.code}\n`;
 
+      // Allow the gateway to fall back to the Host header for origin checking.
+      // Required when running behind a reverse proxy without a known public domain,
+      // otherwise the gateway rejects Control UI connections with "origin not allowed".
+      const originFallbackResult = await runCmd(
+        OPENCLAW_NODE,
+        clawArgs([
+          "config",
+          "set",
+          "gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback",
+          "true",
+        ]),
+      );
+      extra += `[config] gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback=true exit=${originFallbackResult.code}\n`;
+
       const tokenResult = await runCmd(
         OPENCLAW_NODE,
         clawArgs([
@@ -1194,6 +1208,13 @@ const server = app.listen(PORT, () => {
       } catch (err) {
         log.warn("wrapper", `doctor --fix failed: ${err.message}`);
       }
+      // Ensure origin fallback is set for already-configured instances.
+      // This fixes "origin not allowed" on existing deployments after upgrade.
+      const of = await runCmd(OPENCLAW_NODE, clawArgs([
+        "config", "set",
+        "gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback", "true",
+      ]));
+      log.info("wrapper", `origin fallback set exit=${of.code}`);
       await ensureGatewayRunning();
     })().catch((err) => {
       log.error("wrapper", `failed to start gateway at boot: ${err.message}`);
