@@ -1,0 +1,17 @@
+{
+  "name": "openclaw-setup-server",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "http-proxy": "^1.18.1",
+    "node-pty": "^1.0.0",
+    "ws": "^8.18.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["node-pty"]
+  }
+}

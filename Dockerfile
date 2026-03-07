@@ -22,6 +22,14 @@ RUN corepack enable
 WORKDIR /app
 RUN chown node:node /app
 
+# python3 + build-essential are required to compile node-pty (native C++ addon)
+# used by the setup server's optional web TUI feature. zip is used for state export.
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      python3 build-essential zip && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
 ARG OPENCLAW_DOCKER_APT_PACKAGES=""
 RUN if [ -n "$OPENCLAW_DOCKER_APT_PACKAGES" ]; then \
       apt-get update && \
@@ -103,6 +111,10 @@ RUN pnpm build
 # Force pnpm for UI build (Bun may fail on ARM/Synology architectures)
 ENV OPENCLAW_PREFER_PNPM=1
 RUN pnpm ui:build
+
+# Install setup server dependencies (express, ws, http-proxy, node-pty).
+# Runs after the full source copy so src/setup-server/package.json is available.
+RUN cd /app/src/setup-server && npm install --omit=dev
 
 # Expose the CLI binary without requiring npm global writes as non-root.
 USER root
