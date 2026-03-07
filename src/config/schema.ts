@@ -419,7 +419,6 @@ function stripChannelSchema(schema: ConfigSchema): ConfigSchema {
   }
   const channelsNode = asSchemaObject(root.properties.channels);
   if (channelsNode) {
-    channelsNode.properties = {};
     channelsNode.required = [];
     channelsNode.additionalProperties = true;
   }
