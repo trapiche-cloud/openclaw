@@ -334,13 +334,19 @@ async function restartGateway() {
   return ensureGatewayRunning();
 }
 
-// Auto-approve any pending device pairing requests every 3 seconds.
+// Auto-approve any pending device pairing requests every 10 seconds.
 // Users already authenticated via SETUP_PASSWORD — manual pairing approval is redundant friction.
+// Interval is 10s (not 3s) to avoid stacking concurrent node processes: each `devices approve`
+// spawn costs ~100-150 MB RSS. At 3s intervals, slow WebSocket handshakes cause 3-4 processes
+// to overlap and spike total container memory past the limit (SIGKILL/OOM).
+// The concurrency guard below ensures only one approval run is in-flight at a time.
 function startDeviceAutoApprover() {
   if (deviceApproveInterval) return;
   const gatewayWsUrl = `ws://${INTERNAL_GATEWAY_HOST}:${INTERNAL_GATEWAY_PORT}`;
+  let approveRunning = false;
   deviceApproveInterval = setInterval(async () => {
-    if (shuttingDown || !isGatewayReady()) return;
+    if (shuttingDown || !isGatewayReady() || approveRunning) return;
+    approveRunning = true;
     try {
       const result = await runCmd(
         OPENCLAW_NODE,
@@ -352,8 +358,10 @@ function startDeviceAutoApprover() {
       }
     } catch (err) {
       log.warn("device-approver", `unexpected error: ${String(err)}`);
+    } finally {
+      approveRunning = false;
     }
-  }, 3000);
+  }, 10_000);
 }
 
 const setupRateLimiter = {
