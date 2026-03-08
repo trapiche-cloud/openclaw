@@ -13,4 +13,10 @@ set -e
 #   ENABLE_WEB_TUI           - set to "true" to enable the browser terminal at /tui
 #   PORT                     - listening port (default: 3000)
 
+# Ensure state directory exists with correct permissions and credentials subdir present.
+# Fixes doctor warnings: "State directory permissions too open" and "OAuth dir missing".
+STATE_DIR="${OPENCLAW_STATE_DIR:-${HOME}/.openclaw}"
+mkdir -p "${STATE_DIR}/credentials"
+chmod 700 "${STATE_DIR}" 2>/dev/null || true
+
 exec node /app/src/setup-server/server.js

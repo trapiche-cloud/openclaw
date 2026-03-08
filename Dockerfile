@@ -119,10 +119,19 @@ RUN cd /app/src/setup-server && npm install --omit=dev
 # Expose the CLI binary without requiring npm global writes as non-root.
 USER root
 RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
- && chmod 755 /app/openclaw.mjs
+ && chmod 755 /app/openclaw.mjs \
+ && mkdir -p /var/tmp/openclaw-compile-cache \
+ && chown node:node /var/tmp/openclaw-compile-cache
 
 ENV NODE_ENV=production
 ENV PORT=3000
+# Prevent gateway self-respawn loop when running under the setup-server wrapper.
+# With this set, the gateway uses in-process restarts (SIGUSR1) instead of spawning
+# a detached child process and exiting, which confuses the wrapper's process tracking.
+ENV OPENCLAW_NO_RESPAWN=1
+# Speed up repeated CLI invocations (doctor, devices approve, etc.) by caching
+# compiled bytecode. Reduces startup time and memory pressure on low-memory hosts.
+ENV NODE_COMPILE_CACHE=/var/tmp/openclaw-compile-cache
 
 # Security hardening: Run as non-root user
 # The node:22-bookworm image includes a 'node' user (uid 1000)
