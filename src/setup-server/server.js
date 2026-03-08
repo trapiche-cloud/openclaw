@@ -244,6 +244,11 @@ async function startGateway() {
       ...process.env,
       OPENCLAW_STATE_DIR: STATE_DIR,
       OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
+      // Prevent the gateway from self-respawning (spawning a detached child and
+      // exiting with code 0/1), which confuses this wrapper's process tracking
+      // and causes an infinite restart loop. With this set, the gateway does
+      // in-process restarts via SIGUSR1 instead.
+      OPENCLAW_NO_RESPAWN: "1",
     },
   });
   gatewayStartedAt = Date.now();
@@ -255,7 +260,7 @@ async function startGateway() {
   log.info("gateway", `STATE_DIR: ${STATE_DIR}`);
   log.info("gateway", `WORKSPACE_DIR: ${WORKSPACE_DIR}`);
   log.info("gateway", `config path: ${configPath()}`);
-  log.info("gateway", `OPENCLAW_NO_RESPAWN=${process.env.OPENCLAW_NO_RESPAWN ?? "(not set)"} — if unset, gateway self-respawns on restart signals (exit=0) causing a restart loop`);
+  log.info("gateway", `OPENCLAW_NO_RESPAWN=1 (set by wrapper — gateway uses in-process restarts)`);
 
   gatewayProc.on("error", (err) => {
     log.error("gateway", `spawn error: ${String(err)}`);
