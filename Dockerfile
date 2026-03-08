@@ -125,6 +125,9 @@ RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
 
 ENV NODE_ENV=production
 ENV PORT=3000
+# Cap Node.js heap at 1.3 GiB so GC kicks in before hitting the container memory limit.
+# This does NOT set the container limit — do that in docker-compose or docker run --memory.
+ENV NODE_OPTIONS=--max-old-space-size=1300
 # Prevent gateway self-respawn loop when running under the setup-server wrapper.
 # With this set, the gateway uses in-process restarts (SIGUSR1) instead of spawning
 # a detached child process and exiting, which confuses the wrapper's process tracking.
