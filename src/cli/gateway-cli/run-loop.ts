@@ -60,13 +60,19 @@ export async function runGatewayLoop(params: {
   const handleRestartAfterServerClose = async () => {
     const hadLock = await releaseLockIfHeld();
     // Release the lock BEFORE spawning so the child can acquire it immediately.
+    const noRespawn = process.env.OPENCLAW_NO_RESPAWN;
+    gatewayLog.info(`restart: OPENCLAW_NO_RESPAWN=${noRespawn ?? "(not set)"}`);
     const respawn = restartGatewayProcessWithFreshPid();
     if (respawn.mode === "spawned" || respawn.mode === "supervised") {
       const modeLabel =
         respawn.mode === "spawned"
           ? `spawned pid ${respawn.pid ?? "unknown"}`
           : "supervisor restart";
-      gatewayLog.info(`restart mode: full process restart (${modeLabel})`);
+      // When OPENCLAW_NO_RESPAWN is not set in a Docker/wrapper environment, the gateway
+      // spawns a detached child and exits (exit=0). The wrapper's exit handler then kills
+      // the detached child and starts a fresh gateway, creating a restart loop.
+      // Fix: set OPENCLAW_NO_RESPAWN=1 in the wrapper environment.
+      gatewayLog.info(`restart mode: full process restart (${modeLabel}) — if running under a wrapper (Docker/Railway), set OPENCLAW_NO_RESPAWN=1 to prevent this loop`);
       exitProcess(0);
       return;
     }

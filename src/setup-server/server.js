@@ -175,6 +175,7 @@ async function syncAllowedOrigins() {
 }
 
 let gatewayProc = null;
+let gatewayStartedAt = null;
 let gatewayStarting = null;
 let shuttingDown = false;
 let deviceApproveInterval = null;
@@ -245,6 +246,7 @@ async function startGateway() {
       OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
     },
   });
+  gatewayStartedAt = Date.now();
 
   const safeArgs = args.map((arg, i) =>
     args[i - 1] === "--token" ? "[REDACTED]" : arg
@@ -253,15 +255,27 @@ async function startGateway() {
   log.info("gateway", `STATE_DIR: ${STATE_DIR}`);
   log.info("gateway", `WORKSPACE_DIR: ${WORKSPACE_DIR}`);
   log.info("gateway", `config path: ${configPath()}`);
+  log.info("gateway", `OPENCLAW_NO_RESPAWN=${process.env.OPENCLAW_NO_RESPAWN ?? "(not set)"} — if unset, gateway self-respawns on restart signals (exit=0) causing a restart loop`);
 
   gatewayProc.on("error", (err) => {
     log.error("gateway", `spawn error: ${String(err)}`);
     gatewayProc = null;
+    gatewayStartedAt = null;
   });
 
   gatewayProc.on("exit", (code, signal) => {
-    log.error("gateway", `exited code=${code} signal=${signal}`);
+    const uptimeSec = gatewayStartedAt ? ((Date.now() - gatewayStartedAt) / 1000).toFixed(1) : "unknown";
+    const freeMB = (os.freemem() / 1024 / 1024).toFixed(0);
+    const totalMB = (os.totalmem() / 1024 / 1024).toFixed(0);
+    const wrapperRssMB = (process.memoryUsage().rss / 1024 / 1024).toFixed(1);
+    log.info("gateway", `exited code=${code} signal=${signal ?? "none"} uptime=${uptimeSec}s sys-mem-free=${freeMB}/${totalMB}MB wrapper-rss=${wrapperRssMB}MB`);
+    if (code === 0 && !signal) {
+      log.info("gateway", "exit=0 with no signal — this is a gateway self-respawn (OPENCLAW_NO_RESPAWN not set); the gateway spawned a detached child and exited cleanly, causing this restart loop");
+    } else if (signal) {
+      log.info("gateway", `exit via signal=${signal} — killed externally (SIGTERM from stop, OOM killer uses SIGKILL)`);
+    }
     gatewayProc = null;
+    gatewayStartedAt = null;
     if (!shuttingDown && isConfigured()) {
       log.info("gateway", "scheduling auto-restart in 2s...");
       setTimeout(() => {

@@ -456,6 +456,9 @@ export function scheduleGatewaySigusr1Restart(opts?: {
     }
   }
 
+  restartLog.info(
+    `gateway restart scheduled: reason=${reason ?? "unspecified"} delayMs=${Math.max(0, requestedDueAt - nowMs)} cooldownMs=${cooldownMsApplied} ${formatRestartAudit(opts?.audit)}`,
+  );
   pendingRestartDueAt = requestedDueAt;
   pendingRestartReason = reason;
   pendingRestartTimer = setTimeout(
