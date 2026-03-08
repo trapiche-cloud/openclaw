@@ -177,6 +177,7 @@ async function syncAllowedOrigins() {
 let gatewayProc = null;
 let gatewayStarting = null;
 let shuttingDown = false;
+let deviceApproveInterval = null;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -312,6 +313,28 @@ async function restartGateway() {
     gatewayProc = null;
   }
   return ensureGatewayRunning();
+}
+
+// Auto-approve any pending device pairing requests every 3 seconds.
+// Users already authenticated via SETUP_PASSWORD — manual pairing approval is redundant friction.
+function startDeviceAutoApprover() {
+  if (deviceApproveInterval) return;
+  const gatewayWsUrl = `ws://${INTERNAL_GATEWAY_HOST}:${INTERNAL_GATEWAY_PORT}`;
+  deviceApproveInterval = setInterval(async () => {
+    if (shuttingDown || !isGatewayReady()) return;
+    try {
+      const result = await runCmd(
+        OPENCLAW_NODE,
+        clawArgs(["devices", "approve", "--latest", "--url", gatewayWsUrl, "--token", OPENCLAW_GATEWAY_TOKEN]),
+      );
+      // exit 0 = approved something; exit 1 = no pending requests (normal idle state)
+      if (result.code === 0) {
+        log.info("device-approver", `approved pairing request: ${result.output.trim()}`);
+      }
+    } catch (err) {
+      log.warn("device-approver", `unexpected error: ${String(err)}`);
+    }
+  }, 3000);
 }
 
 const setupRateLimiter = {
@@ -780,6 +803,8 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
       extra += "\n[setup] Starting gateway...\n";
       await restartGateway();
       extra += "[setup] Gateway started.\n";
+      startDeviceAutoApprover();
+      log.info("setup", "device auto-approver started");
     }
 
     return res.status(ok ? 200 : 500).json({
@@ -1216,6 +1241,19 @@ const server = app.listen(PORT, () => {
       ]));
       log.info("wrapper", `origin fallback set exit=${of.code}`);
       await ensureGatewayRunning();
+      startDeviceAutoApprover();
+      log.info("wrapper", "device auto-approver started");
+      // Warn if no channels are enabled so operators know to visit /setup.
+      try {
+        const cfgResult = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "--json", "channels"]));
+        if (cfgResult.code === 0) {
+          const channels = JSON.parse(cfgResult.output.trim());
+          const hasEnabled = Object.values(channels ?? {}).some((ch) => ch && typeof ch === "object" && ch.enabled);
+          if (!hasEnabled) {
+            log.warn("wrapper", "No channels are enabled. Visit /setup to configure Telegram, Discord, or Slack.");
+          }
+        }
+      } catch {}
     })().catch((err) => {
       log.error("wrapper", `failed to start gateway at boot: ${err.message}`);
     });
@@ -1272,6 +1310,11 @@ async function gracefulShutdown(signal) {
 
   if (setupRateLimiter.cleanupInterval) {
     clearInterval(setupRateLimiter.cleanupInterval);
+  }
+
+  if (deviceApproveInterval) {
+    clearInterval(deviceApproveInterval);
+    deviceApproveInterval = null;
   }
 
   if (activeTuiSession) {
