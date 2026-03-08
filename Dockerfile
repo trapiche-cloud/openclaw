@@ -121,10 +121,16 @@ USER root
 RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
  && chmod 755 /app/openclaw.mjs \
  && mkdir -p /var/tmp/openclaw-compile-cache \
- && chown node:node /var/tmp/openclaw-compile-cache
+ && chown node:node /var/tmp/openclaw-compile-cache \
+ && mkdir -p /home/node/.npm-global \
+ && chown node:node /home/node/.npm-global
 
 ENV NODE_ENV=production
 ENV PORT=3000
+# Allow the node user to install npm global packages (e.g. skills/plugins installed at runtime).
+# Without this, npm install --global fails with EACCES on /usr/local/lib/node_modules.
+ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
+ENV PATH="/home/node/.npm-global/bin:${PATH}"
 # Cap Node.js heap at 1.3 GiB so GC kicks in before hitting the container memory limit.
 # This does NOT set the container limit — do that in docker-compose or docker run --memory.
 ENV NODE_OPTIONS=--max-old-space-size=1300
